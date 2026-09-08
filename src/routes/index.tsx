@@ -185,7 +185,7 @@ function Dashboard() {
       ),
     );
     setConfetti(Date.now());
-    toast.success(`🎁 ${fmt(moved)} starts @${main.username} akkauntiga yuborildi`);
+    toast.success(`🎁 ${fmt(moved)} starts @${main?.username ?? "asosiy"} akkauntiga yuborildi`);
   };
 
   return (
