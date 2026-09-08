@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ACCOUNTS, fmt, fmtDate, maskPhone, type HistoryItem } from "@/lib/accounts";
+import { loadAccounts, fmt, fmtDate, maskPhone, type HistoryItem } from "@/lib/accounts";
 
 export const Route = createFileRoute("/account/$id")({
   head: () => ({
@@ -30,7 +30,7 @@ const FILTERS = [
 
 function AccountHistory() {
   const { id } = useParams({ from: "/account/$id" });
-  const account = ACCOUNTS.find((a) => a.id === Number(id));
+  const account = useMemo(() => loadAccounts().find((a) => a.id === Number(id)), [id]);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("today");
   const [confirm, setConfirm] = useState(false);
 
