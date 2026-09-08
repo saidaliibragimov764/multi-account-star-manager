@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ACCESS_CODE,
-  ACCOUNTS,
   AUTH_KEY,
+  createAccount,
   fmt,
+  loadAccounts,
   maskPhone,
+  saveAccounts,
   totals,
   type Account,
 } from "@/lib/accounts";
@@ -123,12 +125,17 @@ function StatBox({ label, value }: { label: string; value: number }) {
 }
 
 function Dashboard() {
-  const [accounts, setAccounts] = useState<Account[]>(ACCOUNTS);
+  const [accounts, setAccounts] = useState<Account[]>(() => loadAccounts());
   const [clock, setClock] = useState(new Date());
   const [confetti, setConfetti] = useState(0);
   const [online, setOnline] = useState(true);
+  const [adding, setAdding] = useState(false);
   const sums = useMemo(() => totals(accounts), [accounts]);
-  const main = accounts.find((a) => a.is_main)!;
+  const main = accounts.find((a) => a.is_main);
+
+  useEffect(() => {
+    saveAccounts(accounts);
+  }, [accounts]);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -147,6 +154,22 @@ function Dashboard() {
       window.removeEventListener("offline", down);
     };
   }, []);
+
+  const addAccount = (v: { name: string; username: string; phone: string; is_main: boolean }) => {
+    const created = createAccount(v);
+    setAccounts((prev) => [
+      ...(created.is_main ? prev.map((a) => ({ ...a, is_main: false })) : prev),
+      created,
+    ]);
+    setAdding(false);
+    toast.success(`@${created.username} qo'shildi`);
+  };
+
+  const removeAccount = (id: number) => {
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    toast("Akkaunt o'chirildi");
+  };
+
 
   const sendAll = () => {
     const moved = accounts.filter((a) => !a.is_main).reduce((s, a) => s + a.stats.today, 0);
