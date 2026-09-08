@@ -103,3 +103,43 @@ export const fmtDate = (iso: string) => {
 
 export const ACCESS_CODE = "Mirfayz2010";
 export const AUTH_KEY = "userbot_auth_ok";
+
+export const STORE_KEY = "userbot_accounts_v1";
+
+export function loadAccounts(): Account[] {
+  if (typeof window === "undefined") return ACCOUNTS;
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return ACCOUNTS;
+    const parsed = JSON.parse(raw) as Account[];
+    return Array.isArray(parsed) && parsed.length ? parsed : ACCOUNTS;
+  } catch {
+    return ACCOUNTS;
+  }
+}
+
+export function saveAccounts(accs: Account[]) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(accs));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function createAccount(input: {
+  name: string;
+  username: string;
+  phone: string;
+  is_main: boolean;
+}): Account {
+  return {
+    id: Date.now(),
+    name: input.name.trim().slice(0, 60),
+    username: input.username.trim().replace(/^@/, "").slice(0, 32),
+    phone: input.phone.trim().slice(0, 20),
+    is_main: input.is_main,
+    online: true,
+    stats: { today: 0, week: 0, month: 0, total: 0 },
+    history: [],
+  };
+}

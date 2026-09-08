@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ACCESS_CODE,
-  ACCOUNTS,
   AUTH_KEY,
+  createAccount,
   fmt,
+  loadAccounts,
   maskPhone,
+  saveAccounts,
   totals,
   type Account,
 } from "@/lib/accounts";
@@ -123,12 +125,17 @@ function StatBox({ label, value }: { label: string; value: number }) {
 }
 
 function Dashboard() {
-  const [accounts, setAccounts] = useState<Account[]>(ACCOUNTS);
+  const [accounts, setAccounts] = useState<Account[]>(() => loadAccounts());
   const [clock, setClock] = useState(new Date());
   const [confetti, setConfetti] = useState(0);
   const [online, setOnline] = useState(true);
+  const [adding, setAdding] = useState(false);
   const sums = useMemo(() => totals(accounts), [accounts]);
-  const main = accounts.find((a) => a.is_main)!;
+  const main = accounts.find((a) => a.is_main);
+
+  useEffect(() => {
+    saveAccounts(accounts);
+  }, [accounts]);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -148,7 +155,27 @@ function Dashboard() {
     };
   }, []);
 
+  const addAccount = (v: { name: string; username: string; phone: string; is_main: boolean }) => {
+    const created = createAccount(v);
+    setAccounts((prev) => [
+      ...(created.is_main ? prev.map((a) => ({ ...a, is_main: false })) : prev),
+      created,
+    ]);
+    setAdding(false);
+    toast.success(`@${created.username} qo'shildi`);
+  };
+
+  const removeAccount = (id: number) => {
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    toast("Akkaunt o'chirildi");
+  };
+
+
   const sendAll = () => {
+    if (!main) {
+      toast.error("Avval asosiy akkauntni belgilang");
+      return;
+    }
     const moved = accounts.filter((a) => !a.is_main).reduce((s, a) => s + a.stats.today, 0);
     if (moved <= 0) {
       toast("Yuboriladigan starts yo'q");
@@ -162,7 +189,7 @@ function Dashboard() {
       ),
     );
     setConfetti(Date.now());
-    toast.success(`🎁 ${fmt(moved)} starts @${main.username} akkauntiga yuborildi`);
+    toast.success(`🎁 ${fmt(moved)} starts @${main?.username ?? "asosiy"} akkauntiga yuborildi`);
   };
 
   return (
@@ -192,43 +219,59 @@ function Dashboard() {
         </div>
       </header>
 
-      <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">
-        Akkauntlar ({accounts.length})
-      </h2>
+      <div className="mb-2 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-muted-foreground">
+          Akkauntlar ({accounts.length})
+        </h2>
+        <button
+          onClick={() => setAdding(true)}
+          className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold hover:bg-secondary/70"
+        >
+          + Akkaunt qo'shish
+        </button>
+      </div>
       <div className="space-y-3">
         {accounts.map((a) => (
-          <Link
-            key={a.id}
-            to="/account/$id"
-            params={{ id: String(a.id) }}
-            className={`card-tap glass-card block p-4 hover:-translate-y-0.5 hover:shadow-lg ${
-              a.is_main ? "ring-2 ring-primary" : ""
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      a.online ? "bg-success" : "bg-destructive"
-                    }`}
-                  />
-                  <p className="truncate font-semibold">{a.name}</p>
-                  {a.is_main && (
-                    <span className="rounded-full bg-primary/25 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                      ⭐ Asosiy
-                    </span>
-                  )}
+          <div key={a.id} className="relative">
+            <Link
+              to="/account/$id"
+              params={{ id: String(a.id) }}
+              className={`card-tap glass-card block p-4 hover:-translate-y-0.5 hover:shadow-lg ${
+                a.is_main ? "ring-2 ring-primary" : ""
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        a.online ? "bg-success" : "bg-destructive"
+                      }`}
+                    />
+                    <p className="truncate font-semibold">{a.name}</p>
+                    {a.is_main && (
+                      <span className="rounded-full bg-primary/25 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        ⭐ Asosiy
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-accent">@{a.username}</p>
+                  <p className="text-xs text-muted-foreground">{maskPhone(a.phone)}</p>
                 </div>
-                <p className="mt-1 text-sm text-accent">@{a.username}</p>
-                <p className="text-xs text-muted-foreground">{maskPhone(a.phone)}</p>
+                <div className="mr-8 text-right">
+                  <p className="text-xs text-muted-foreground">Bugun</p>
+                  <p className="text-xl font-bold text-star">{fmt(a.stats.today)}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Bugun</p>
-                <p className="text-xl font-bold text-star">{fmt(a.stats.today)}</p>
-              </div>
-            </div>
-          </Link>
+            </Link>
+            <button
+              onClick={() => removeAccount(a.id)}
+              aria-label="O'chirish"
+              className="absolute right-2 top-2 rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+            >
+              ✕
+            </button>
+          </div>
         ))}
       </div>
 
@@ -237,9 +280,111 @@ function Dashboard() {
           onClick={sendAll}
           className="gift-button w-full rounded-2xl py-4 text-base font-bold text-primary-foreground hover:opacity-95"
         >
-          🎁 Barcha startslarni @{main.username} ga yuborish ✨
+          🎁 Barcha startslarni {main ? `@${main.username} ga` : "asosiy akkauntga"} yuborish ✨
         </button>
       </div>
+
+      {adding && <AddAccountModal onClose={() => setAdding(false)} onAdd={addAccount} />}
     </main>
   );
 }
+
+function AddAccountModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (v: { name: string; username: string; phone: string; is_main: boolean }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isMain, setIsMain] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim().length < 2) return setError("Ismni to'liq kiriting");
+    const u = username.trim().replace(/^@/, "");
+    if (!/^[A-Za-z0-9_]{3,32}$/.test(u)) return setError("Username 3-32 ta harf/raqam bo'lsin");
+    if (!/^\+?[0-9 ()-]{7,20}$/.test(phone.trim())) return setError("Telefon raqami noto'g'ri");
+    onAdd({ name, username: u, phone, is_main: isMain });
+  };
+
+  const field =
+    "mt-1 w-full rounded-xl border border-input bg-secondary/60 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-5">
+      <form onSubmit={submit} className="glass-card w-full max-w-sm p-5">
+        <h3 className="text-lg font-bold">Yangi akkaunt</h3>
+        <label className="mt-4 block text-xs text-muted-foreground">
+          To'liq ism
+          <input
+            className={field}
+            value={name}
+            maxLength={60}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError("");
+            }}
+            placeholder="Aziz Karimov"
+          />
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">
+          Username
+          <input
+            className={field}
+            value={username}
+            maxLength={33}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setError("");
+            }}
+            placeholder="@username"
+          />
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">
+          Telefon raqami
+          <input
+            className={field}
+            value={phone}
+            maxLength={20}
+            inputMode="tel"
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setError("");
+            }}
+            placeholder="+998 90 123 45 67"
+          />
+        </label>
+        <label className="mt-4 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={isMain}
+            onChange={(e) => setIsMain(e.target.checked)}
+            className="h-4 w-4 accent-[oklch(0.62_0.19_295)]"
+          />
+          Asosiy akkaunt sifatida belgilash
+        </label>
+        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-secondary py-3 text-sm font-medium"
+          >
+            Bekor qilish
+          </button>
+          <button
+            type="submit"
+            className="gift-button flex-1 rounded-xl py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Qo'shish
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
