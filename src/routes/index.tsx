@@ -172,6 +172,10 @@ function Dashboard() {
 
 
   const sendAll = () => {
+    if (!main) {
+      toast.error("Avval asosiy akkauntni belgilang");
+      return;
+    }
     const moved = accounts.filter((a) => !a.is_main).reduce((s, a) => s + a.stats.today, 0);
     if (moved <= 0) {
       toast("Yuboriladigan starts yo'q");
