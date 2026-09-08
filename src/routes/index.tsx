@@ -1,24 +1,245 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  ACCESS_CODE,
+  ACCOUNTS,
+  AUTH_KEY,
+  fmt,
+  maskPhone,
+  totals,
+  type Account,
+} from "@/lib/accounts";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Starts Manager — Telegram akkauntlar paneli" },
+      {
+        name: "description",
+        content:
+          "Bir nechta Telegram akkauntlarning starts statistikasini kuzating va barcha startslarni asosiy akkauntga yuboring.",
+      },
+      { property: "og:title", content: "Starts Manager — Telegram akkauntlar paneli" },
+      {
+        property: "og:description",
+        content: "Akkauntlar statistikasi, tarix va startslarni bir tugma bilan yig'ish.",
+      },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Confetti({ run }: { run: number }) {
+  if (!run) return null;
+  const colors = ["#7b2ff7", "#f107a3", "#ffb830", "#3ddc97", "#4cc9f0"];
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <>
+      {Array.from({ length: 60 }).map((_, i) => (
+        <span
+          key={`${run}-${i}`}
+          className="confetti-piece"
+          style={{
+            left: `${Math.random() * 100}%`,
+            background: colors[i % colors.length],
+            animationDelay: `${Math.random() * 0.6}s`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function Index() {
+  const [authed, setAuthed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setAuthed(localStorage.getItem(AUTH_KEY) === "1");
+    setReady(true);
+    const tg = (window as unknown as { Telegram?: { WebApp?: { ready: () => void; expand: () => void } } })
+      .Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
+  }, []);
+
+  if (!ready) return null;
+  return authed ? <Dashboard /> : <Login onSuccess={() => setAuthed(true)} />;
+}
+
+function Login({ onSuccess }: { onSuccess: () => void }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim() === ACCESS_CODE) {
+      localStorage.setItem(AUTH_KEY, "1");
+      onSuccess();
+    } else {
+      setError("Kod noto'g'ri. Qayta urinib ko'ring.");
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center px-5">
+      <form onSubmit={submit} className="glass-card w-full max-w-sm p-7 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full gift-button text-2xl">
+          🔐
+        </div>
+        <h1 className="text-2xl font-bold">Kodni kiriting</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Panelga kirish uchun maxfiy kodni yozing
+        </p>
+        <input
+          type="password"
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setError("");
+          }}
+          placeholder="••••••••"
+          className="mt-6 w-full rounded-xl border border-input bg-secondary/60 px-4 py-3 text-center text-lg tracking-widest outline-none focus:ring-2 focus:ring-ring"
+        />
+        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        <button
+          type="submit"
+          className="gift-button mt-5 w-full rounded-xl py-3 text-base font-semibold text-primary-foreground hover:opacity-90"
+        >
+          Kirish
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function StatBox({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="glass-card p-3 text-center">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-bold text-star">{fmt(value)}</p>
     </div>
+  );
+}
+
+function Dashboard() {
+  const [accounts, setAccounts] = useState<Account[]>(ACCOUNTS);
+  const [clock, setClock] = useState(new Date());
+  const [confetti, setConfetti] = useState(0);
+  const [online, setOnline] = useState(true);
+  const sums = useMemo(() => totals(accounts), [accounts]);
+  const main = accounts.find((a) => a.is_main)!;
+
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    const r = setInterval(() => setAccounts((a) => [...a]), 30000);
+    const up = () => setOnline(true);
+    const down = () => {
+      setOnline(false);
+      toast.error("Internet uzildi — ma'lumotlar yangilanmayapti");
+    };
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      clearInterval(t);
+      clearInterval(r);
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+
+  const sendAll = () => {
+    const moved = accounts.filter((a) => !a.is_main).reduce((s, a) => s + a.stats.today, 0);
+    if (moved <= 0) {
+      toast("Yuboriladigan starts yo'q");
+      return;
+    }
+    setAccounts((prev) =>
+      prev.map((a) =>
+        a.is_main
+          ? { ...a, stats: { ...a.stats, today: a.stats.today + moved } }
+          : { ...a, stats: { ...a.stats, today: 0 } },
+      ),
+    );
+    setConfetti(Date.now());
+    toast.success(`🎁 ${fmt(moved)} starts @${main.username} akkauntiga yuborildi`);
+  };
+
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-lg px-4 pb-28 pt-5">
+      <Confetti run={confetti} />
+      <header className="glass-card mb-4 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">Joriy vaqt</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {clock.toLocaleTimeString("uz-UZ")}
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              online ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
+            }`}
+          >
+            {online ? "Onlayn" : "Oflayn"}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <StatBox label="Bugun" value={sums.today} />
+          <StatBox label="Hafta" value={sums.week} />
+          <StatBox label="Oy" value={sums.month} />
+          <StatBox label="Barchasi" value={sums.total} />
+        </div>
+      </header>
+
+      <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">
+        Akkauntlar ({accounts.length})
+      </h2>
+      <div className="space-y-3">
+        {accounts.map((a) => (
+          <Link
+            key={a.id}
+            to="/account/$id"
+            params={{ id: String(a.id) }}
+            className={`card-tap glass-card block p-4 hover:-translate-y-0.5 hover:shadow-lg ${
+              a.is_main ? "ring-2 ring-primary" : ""
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                      a.online ? "bg-success" : "bg-destructive"
+                    }`}
+                  />
+                  <p className="truncate font-semibold">{a.name}</p>
+                  {a.is_main && (
+                    <span className="rounded-full bg-primary/25 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                      ⭐ Asosiy
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-accent">@{a.username}</p>
+                <p className="text-xs text-muted-foreground">{maskPhone(a.phone)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Bugun</p>
+                <p className="text-xl font-bold text-star">{fmt(a.stats.today)}</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg px-4 pb-4">
+        <button
+          onClick={sendAll}
+          className="gift-button w-full rounded-2xl py-4 text-base font-bold text-primary-foreground hover:opacity-95"
+        >
+          🎁 Barcha startslarni @{main.username} ga yuborish ✨
+        </button>
+      </div>
+    </main>
   );
 }
