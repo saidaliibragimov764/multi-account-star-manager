@@ -30,26 +30,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-function Confetti({ run }: { run: number }) {
-  if (!run) return null;
-  const colors = ["#7b2ff7", "#f107a3", "#ffb830", "#3ddc97", "#4cc9f0"];
-  return (
-    <>
-      {Array.from({ length: 60 }).map((_, i) => (
-        <span
-          key={`${run}-${i}`}
-          className="confetti-piece"
-          style={{
-            left: `${Math.random() * 100}%`,
-            background: colors[i % colors.length],
-            animationDelay: `${Math.random() * 0.6}s`,
-          }}
-        />
-      ))}
-    </>
-  );
-}
-
 function Index() {
   useEffect(() => {
     const tg = (
@@ -74,7 +54,6 @@ function StatBox({ label, value }: { label: string; value: number }) {
 function Dashboard() {
   const [accounts, setAccounts] = useState<Account[]>(() => loadAccounts());
   const [clock, setClock] = useState(new Date());
-  const [confetti, setConfetti] = useState(0);
   const [online, setOnline] = useState(true);
   const [adding, setAdding] = useState(false);
   const sums = useMemo(() => totals(accounts), [accounts]);
@@ -122,30 +101,8 @@ function Dashboard() {
     toast("Akkaunt o'chirildi");
   };
 
-  const sendAll = () => {
-    if (!main) {
-      toast.error("Avval asosiy akkauntni belgilang");
-      return;
-    }
-    const moved = accounts.filter((a) => !a.is_main).reduce((s, a) => s + a.stats.today, 0);
-    if (moved <= 0) {
-      toast("Yuboriladigan starts yo'q");
-      return;
-    }
-    setAccounts((prev) =>
-      prev.map((a) =>
-        a.is_main
-          ? { ...a, stats: { ...a.stats, today: a.stats.today + moved } }
-          : { ...a, stats: { ...a.stats, today: 0 } },
-      ),
-    );
-    setConfetti(Date.now());
-    toast.success(`🎁 ${fmt(moved)} starts @${main?.username ?? "asosiy"} akkauntiga yuborildi`);
-  };
-
   return (
     <main className="mx-auto min-h-screen w-full max-w-lg px-4 pb-28 pt-5">
-      <Confetti run={confetti} />
       <header className="glass-card mb-4 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -168,6 +125,30 @@ function Dashboard() {
         </div>
       </header>
 
+      <section className="glass-card mb-5 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Vazifalar manbai</p>
+            <h2 className="mt-1 font-semibold">@patrickstarsrobot</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Vazifalarni botning o'zida bajaring. Ulanish va Stars statistikasi hozircha
+              sozlanmagan.
+            </p>
+          </div>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">
+            Ulanmagan
+          </span>
+        </div>
+        <a
+          href="https://t.me/patrickstarsrobot"
+          target="_blank"
+          rel="noreferrer"
+          className="gift-button mt-3 block rounded-xl px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
+        >
+          Vazifalar botini ochish ↗
+        </a>
+      </section>
+
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-sm font-semibold text-muted-foreground">
           Akkauntlar ({accounts.length})
@@ -180,6 +161,14 @@ function Dashboard() {
         </button>
       </div>
       <div className="space-y-3">
+        {accounts.length === 0 && (
+          <div className="glass-card p-5 text-center">
+            <p className="font-medium">Hali akkaunt qo'shilmagan</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Akkaunt qo'shish tugmasi hozircha brauzerda demo yozuv yaratadi, Telegramga kirmaydi.
+            </p>
+          </div>
+        )}
         {accounts.map((a) => (
           <div key={a.id} className="relative">
             <Link
@@ -225,12 +214,14 @@ function Dashboard() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg px-4 pb-4">
-        <button
-          onClick={sendAll}
-          className="gift-button w-full rounded-2xl py-4 text-base font-bold text-primary-foreground hover:opacity-95"
+        <a
+          href="https://t.me/patrickstarsrobot"
+          target="_blank"
+          rel="noreferrer"
+          className="gift-button block w-full rounded-2xl py-4 text-center text-base font-bold text-primary-foreground hover:opacity-95"
         >
-          🎁 Barcha startslarni {main ? `@${main.username} ga` : "asosiy akkauntga"} yuborish ✨
-        </button>
+          ✨ @patrickstarsrobot’ni ochish
+        </a>
       </div>
 
       {adding && <AddAccountModal onClose={() => setAdding(false)} onAdd={addAccount} />}
