@@ -1,7 +1,13 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { loadAccounts, fmt, fmtDate, maskPhone, type HistoryItem } from "@/lib/accounts";
+import {
+  loadAccounts,
+  saveAccounts,
+  fmt,
+  fmtDate,
+  maskPhone,
+  type HistoryItem,
+} from "@/lib/accounts";
 
 export const Route = createFileRoute("/account/$id")({
   head: () => ({
@@ -30,9 +36,12 @@ const FILTERS = [
 
 function AccountHistory() {
   const { id } = useParams({ from: "/account/$id" });
-  const account = useMemo(() => loadAccounts().find((a) => a.id === Number(id)), [id]);
+  const [accounts, setAccounts] = useState(() => loadAccounts());
+  const account = useMemo(() => accounts.find((a) => a.id === Number(id)), [accounts, id]);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("today");
-  const [confirm, setConfirm] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState("");
 
   const items: HistoryItem[] = useMemo(() => {
     if (!account) return [];
@@ -41,6 +50,44 @@ function AccountHistory() {
     return account.history.filter((h) => hours === Infinity || +new Date(h.timestamp) >= limit);
   }, [account, filter]);
 
+  const recordReward = (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0 || value > 1_000_000) {
+      setError("0 dan katta, to'g'ri miqdor kiriting");
+      return;
+    }
+    if (!account) return;
+    const timestamp = new Date().toISOString();
+    const next = accounts.map((item) =>
+      item.id === account.id
+        ? {
+            ...item,
+            stats: {
+              today: item.stats.today + value,
+              week: item.stats.week + value,
+              month: item.stats.month + value,
+              total: item.stats.total + value,
+            },
+            history: [
+              {
+                timestamp,
+                amount: value,
+                type: "earned" as const,
+                description: "@patrickstarsrobot vazifasidan mukofot (qo'lda qayd etildi)",
+              },
+              ...item.history,
+            ],
+          }
+        : item,
+    );
+    setAccounts(next);
+    saveAccounts(next);
+    setAmount("");
+    setError("");
+    setRecording(false);
+  };
+
   if (!account) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -48,11 +95,6 @@ function AccountHistory() {
       </main>
     );
   }
-
-  const withdraw = () => {
-    setConfirm(false);
-    toast.success(`${fmt(account.stats.today)} starts asosiy akkauntga o'tkazildi`);
-  };
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-lg px-4 pb-28 pt-5">
@@ -121,35 +163,55 @@ function AccountHistory() {
 
       <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg px-4 pb-4">
         <button
-          onClick={() => setConfirm(true)}
+          onClick={() => setRecording(true)}
           className="gift-button w-full rounded-2xl py-4 text-base font-bold text-primary-foreground hover:opacity-95"
         >
-          ✨ Startslarni yechib olish
+          ⭐ Mukofotni qo'lda qayd etish
         </button>
       </div>
 
-      {confirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
-          <div className="glass-card w-full max-w-sm p-5 text-center">
-            <p className="text-lg font-semibold">Tasdiqlaysizmi?</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              @{account.username} akkauntidagi barcha startslar asosiy akkauntga o'tkaziladi.
+      {recording && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-5">
+          <form onSubmit={recordReward} className="glass-card w-full max-w-sm p-5">
+            <h2 className="text-lg font-bold">Stars mukofotini qayd etish</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              @patrickstarsrobot’da olgan mukofotingizni kiriting. Miqdor avtomatik tekshirilmaydi.
             </p>
+            <label className="mt-4 block text-xs text-muted-foreground">
+              Miqdor
+              <input
+                autoFocus
+                type="number"
+                min="0.01"
+                max="1000000"
+                step="0.01"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setError("");
+                }}
+                className="mt-1 w-full rounded-xl border border-input bg-secondary/60 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Masalan: 0.10"
+              />
+            </label>
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
             <div className="mt-5 flex gap-2">
               <button
-                onClick={() => setConfirm(false)}
+                type="button"
+                onClick={() => setRecording(false)}
                 className="flex-1 rounded-xl bg-secondary py-3 text-sm font-medium"
               >
                 Bekor qilish
               </button>
               <button
-                onClick={withdraw}
+                type="submit"
                 className="gift-button flex-1 rounded-xl py-3 text-sm font-semibold text-primary-foreground"
               >
-                Ha, yuborish
+                Saqlash
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </main>
