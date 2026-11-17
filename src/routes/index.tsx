@@ -2,8 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  ACCESS_CODE,
-  AUTH_KEY,
   createAccount,
   fmt,
   loadAccounts,
@@ -53,66 +51,15 @@ function Confetti({ run }: { run: number }) {
 }
 
 function Index() {
-  const [authed, setAuthed] = useState(false);
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
-    setAuthed(localStorage.getItem(AUTH_KEY) === "1");
-    setReady(true);
-    const tg = (window as unknown as { Telegram?: { WebApp?: { ready: () => void; expand: () => void } } })
-      .Telegram?.WebApp;
+    const tg = (
+      window as unknown as { Telegram?: { WebApp?: { ready: () => void; expand: () => void } } }
+    ).Telegram?.WebApp;
     tg?.ready();
     tg?.expand();
   }, []);
 
-  if (!ready) return null;
-  return authed ? <Dashboard /> : <Login onSuccess={() => setAuthed(true)} />;
-}
-
-function Login({ onSuccess }: { onSuccess: () => void }) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (code.trim() === ACCESS_CODE) {
-      localStorage.setItem(AUTH_KEY, "1");
-      onSuccess();
-    } else {
-      setError("Kod noto'g'ri. Qayta urinib ko'ring.");
-    }
-  };
-
-  return (
-    <main className="flex min-h-screen items-center justify-center px-5">
-      <form onSubmit={submit} className="glass-card w-full max-w-sm p-7 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full gift-button text-2xl">
-          🔐
-        </div>
-        <h1 className="text-2xl font-bold">Kodni kiriting</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Panelga kirish uchun maxfiy kodni yozing
-        </p>
-        <input
-          type="password"
-          value={code}
-          onChange={(e) => {
-            setCode(e.target.value);
-            setError("");
-          }}
-          placeholder="••••••••"
-          className="mt-6 w-full rounded-xl border border-input bg-secondary/60 px-4 py-3 text-center text-lg tracking-widest outline-none focus:ring-2 focus:ring-ring"
-        />
-        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-        <button
-          type="submit"
-          className="gift-button mt-5 w-full rounded-xl py-3 text-base font-semibold text-primary-foreground hover:opacity-90"
-        >
-          Kirish
-        </button>
-      </form>
-    </main>
-  );
+  return <Dashboard />;
 }
 
 function StatBox({ label, value }: { label: string; value: number }) {
@@ -156,7 +103,12 @@ function Dashboard() {
   }, []);
 
   const addAccount = (v: { name: string; username: string; phone: string; is_main: boolean }) => {
-    const created = createAccount(v);
+    const normalizedPhone = v.phone.replace(/[\s()-]/g, "");
+    if (accounts.some((account) => account.phone.replace(/[\s()-]/g, "") === normalizedPhone)) {
+      toast.error("Bu telefon raqami allaqachon qo'shilgan");
+      return;
+    }
+    const created = createAccount({ ...v, phone: normalizedPhone });
     setAccounts((prev) => [
       ...(created.is_main ? prev.map((a) => ({ ...a, is_main: false })) : prev),
       created,
@@ -169,7 +121,6 @@ function Dashboard() {
     setAccounts((prev) => prev.filter((a) => a.id !== id));
     toast("Akkaunt o'chirildi");
   };
-
 
   const sendAll = () => {
     if (!main) {
@@ -199,9 +150,7 @@ function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Joriy vaqt</p>
-            <p className="text-2xl font-bold tabular-nums">
-              {clock.toLocaleTimeString("uz-UZ")}
-            </p>
+            <p className="text-2xl font-bold tabular-nums">{clock.toLocaleTimeString("uz-UZ")}</p>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -318,6 +267,10 @@ function AddAccountModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-5">
       <form onSubmit={submit} className="glass-card w-full max-w-sm p-5">
         <h3 className="text-lg font-bold">Yangi akkaunt</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Hozircha ma'lumotlar faqat ushbu brauzerda saqlanadi; Telegram tasdiqlash kodi
+          yuborilmaydi.
+        </p>
         <label className="mt-4 block text-xs text-muted-foreground">
           To'liq ism
           <input
@@ -350,6 +303,8 @@ function AddAccountModal({
             className={field}
             value={phone}
             maxLength={20}
+            type="tel"
+            autoComplete="tel"
             inputMode="tel"
             onChange={(e) => {
               setPhone(e.target.value);
@@ -387,4 +342,3 @@ function AddAccountModal({
     </div>
   );
 }
-
