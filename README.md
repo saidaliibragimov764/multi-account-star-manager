@@ -7,21 +7,7 @@ Funksiyalar:
 
 App birinchi marta ochilganda kod so'raladigan ekran ko'rsatilishi kerak
 
-Kod: Mirfayz2010 (qattiq kodlangan, o'zgartirib bo'lmaydi)
-
-Kod to'g'ri kiritilsa, asosiy interfeysga o'tish
-
-Kod noto'g'ri bo'lsa, xatolik xabari chiqishi
-
-UI Elementlari:
-
-Markazda "Kodni kiriting" sarlavhasi
-
-Pastda kod kiritish maydoni (input field)
-
-"Kirish" tugmasi
-
-Chiroyli gradient fon (to'q ko'k yoki binafsha ranglar)
+Hozircha frontendda qattiq kodlangan kirish kodi ishlatilmaydi. Haqiqiy kirish nazorati keyinchalik backendda amalga oshiriladi; brauzerga yozilgan maxfiy kod xavfsiz himoya hisoblanmaydi.
 
 2. ASOSIY INTERFEYS (Dashboard)
 Yuqori qism:

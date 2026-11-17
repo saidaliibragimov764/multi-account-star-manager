@@ -101,9 +101,6 @@ export const fmtDate = (iso: string) => {
   return `${p(d.getHours())}:${p(d.getMinutes())} | ${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 };
 
-export const ACCESS_CODE = "Mirfayz2010";
-export const AUTH_KEY = "userbot_auth_ok";
-
 export const STORE_KEY = "userbot_accounts_v1";
 
 export function loadAccounts(): Account[] {
